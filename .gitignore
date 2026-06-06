@@ -216,3 +216,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project: uploaded runtime files (keep .gitkeep, ignore actual data)
+backend/uploads/csv/*.csv
+backend/uploads/images/*.jpg
+backend/uploads/images/*.jpeg
+backend/uploads/images/*.png
+
+# Frontend
+node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
