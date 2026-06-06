@@ -6,7 +6,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.dependencies import require_admin
 from app.models.upload_job import JobStatus, UploadJob
+from app.models.user import User
 from app.schemas.upload_job import JobStatusOut
 from app.tasks.ingest_task import bulk_ingest_task
 
@@ -20,6 +22,7 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 async def upload_csv(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
 ):
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are accepted")
@@ -47,7 +50,11 @@ async def upload_csv(
 
 
 @router.get("/{job_id}/status", response_model=JobStatusOut)
-async def get_job_status(job_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_job_status(
+    job_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
     result = await db.execute(select(UploadJob).where(UploadJob.id == job_id))
     job = result.scalar_one_or_none()
     if not job:

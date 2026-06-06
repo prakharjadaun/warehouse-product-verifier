@@ -5,6 +5,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.dependencies import require_admin
+from app.models.user import User
 from app.models.verification_log import VerificationLog
 from app.schemas.verification_log import VerificationOut
 
@@ -18,6 +20,7 @@ async def get_verification_report(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
 ):
     start_dt = datetime(start_date.year, start_date.month, start_date.day, tzinfo=timezone.utc)
     end_dt = datetime(end_date.year, end_date.month, end_date.day, 23, 59, 59, tzinfo=timezone.utc)

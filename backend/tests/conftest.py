@@ -9,6 +9,8 @@ from sqlalchemy.pool import NullPool
 from app.config import settings
 from app.database import get_db
 from app.main import app
+from app.models.user import User, UserRole
+from app.services.auth_service import create_access_token, hash_password
 
 # asyncpg + Windows ProactorEventLoop teardown fix
 if sys.platform == "win32":
@@ -38,3 +40,30 @@ async def client(db: AsyncSession) -> AsyncClient:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def admin_token(db: AsyncSession) -> str:
+    import uuid
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    admin_id = uuid.UUID("00000000-0000-0000-0000-000000000001")
+    await db.execute(
+        pg_insert(User).values(
+            id=admin_id,
+            email="fixture_admin@wms.com",
+            hashed_password=hash_password("adminpass"),
+            full_name="Fixture Admin",
+            role=UserRole.admin,
+            is_active=True,
+        ).on_conflict_do_nothing()
+    )
+    await db.commit()
+    return create_access_token(str(admin_id), "admin")
+
+
+@pytest_asyncio.fixture
+async def authed_client(client: AsyncClient, admin_token: str) -> AsyncClient:
+    client.headers.update({"Authorization": f"Bearer {admin_token}"})
+    yield client
+    client.headers.pop("Authorization", None)
