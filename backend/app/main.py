@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.routers import uploads
+from app.routers import uploads, validations
 
 app = FastAPI(title="Warehouse Product Verifier", version="1.0.0")
 
@@ -19,6 +19,7 @@ app.add_middleware(
 
 # Routers must be registered before static mounts to avoid path conflicts
 app.include_router(uploads.router)
+app.include_router(validations.router)
 
 
 @app.get("/health")
