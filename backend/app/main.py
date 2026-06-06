@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
+from app.routers import uploads
 
 app = FastAPI(title="Warehouse Product Verifier", version="1.0.0")
 
@@ -16,12 +17,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve uploaded images as static files (local dev)
-uploads_dir = Path("uploads")
-uploads_dir.mkdir(exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# Routers must be registered before static mounts to avoid path conflicts
+app.include_router(uploads.router)
 
 
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+# Static file serving for uploaded images (local dev) — mounted last
+media_dir = Path("uploads/images")
+media_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory="uploads/images"), name="media")
