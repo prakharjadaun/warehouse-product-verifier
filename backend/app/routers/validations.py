@@ -1,6 +1,8 @@
+import uuid as uuid_mod
 from datetime import date
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,8 +11,12 @@ from app.models.product import Product
 from app.models.verification_log import AIMatchStatus, VerificationLog
 from app.schemas.product import ProductOut
 from app.schemas.verification_log import VerificationIn, VerificationOut
+from app.services.ai_service import compare_dates, extract_dates_from_image
 
 router = APIRouter(tags=["validation"])
+
+IMAGES_DIR = Path("uploads/images")
+IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @router.get("/products/{wid}", response_model=ProductOut)
@@ -41,6 +47,52 @@ async def log_verification(body: VerificationIn, db: AsyncSession = Depends(get_
         db_mfg_date=product.manufacturing_date if product else None,
         db_expiry_date=product.expiry_date if product else None,
         ai_match_status=AIMatchStatus.skipped,
+    )
+    db.add(log)
+    await db.flush()
+    await db.refresh(log)
+    return log
+
+
+@router.post("/verifications/ai-extract", response_model=VerificationOut, status_code=201)
+async def ai_extract_verification(
+    wid: int = Form(...),
+    operator_id: str | None = Form(None),
+    image: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    image_bytes = await image.read()
+    filename = f"{wid}_{uuid_mod.uuid4().hex}.jpg"
+    image_path = IMAGES_DIR / filename
+    with open(image_path, "wb") as f:
+        f.write(image_bytes)
+
+    result = await db.execute(select(Product).where(Product.wid == wid))
+    product = result.scalar_one_or_none()
+
+    try:
+        extracted = extract_dates_from_image(image_bytes)
+        ai_mfg = extracted["manufacturing_date"]
+        ai_exp = extracted["expiry_date"]
+        status_str = compare_dates(
+            ai_mfg, ai_exp,
+            product.manufacturing_date if product else None,
+            product.expiry_date if product else None,
+        )
+        match_status = AIMatchStatus(status_str)
+    except Exception:
+        ai_mfg, ai_exp = None, None
+        match_status = AIMatchStatus.error
+
+    log = VerificationLog(
+        wid=wid,
+        operator_id=operator_id,
+        image_path=str(image_path),
+        db_mfg_date=product.manufacturing_date if product else None,
+        db_expiry_date=product.expiry_date if product else None,
+        ai_mfg_date=ai_mfg,
+        ai_expiry_date=ai_exp,
+        ai_match_status=match_status,
     )
     db.add(log)
     await db.flush()
