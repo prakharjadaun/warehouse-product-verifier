@@ -101,17 +101,9 @@ A production-grade warehouse operations system built for supply chain inventory 
 
 ## Architecture
 
-```
-React SPA (Ant Design)
-        │ HTTPS
-FastAPI (Python)
-        ├── PostgreSQL     — persistent product + verification data
-        ├── Redis          — Celery task broker + result backend
-        └── Azure OpenAI   — GPT-4o vision for label date extraction
+> Click the diagram to view full size.
 
-Celery Worker
-        └── Reads CSV → PostgreSQL COPY → staging UPSERT → products table
-```
+[![Architecture Diagram](docs/screenshots/architecture.png)](docs/screenshots/architecture.png)
 
 **Key design decisions:**
 
