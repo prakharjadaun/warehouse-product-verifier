@@ -5,6 +5,7 @@ import Login from './pages/Login'
 import AdminLayout from './pages/admin/AdminLayout'
 import Upload from './pages/admin/Upload'
 import Products from './pages/admin/Products'
+import Verify from './pages/admin/Verify'
 import Reports from './pages/admin/Reports'
 import Users from './pages/admin/Users'
 import Validate from './pages/operator/Validate'
@@ -27,6 +28,7 @@ export default function App() {
             <Route index element={<Navigate to="upload" replace />} />
             <Route path="upload" element={<Upload />} />
             <Route path="products" element={<Products />} />
+            <Route path="verify" element={<Verify />} />
             <Route path="reports" element={<Reports />} />
             <Route path="users" element={<Users />} />
           </Route>

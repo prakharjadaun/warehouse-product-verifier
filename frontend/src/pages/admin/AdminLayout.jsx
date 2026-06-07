@@ -1,5 +1,5 @@
 import { Layout, Menu } from 'antd'
-import { UploadOutlined, BarChartOutlined, TeamOutlined, DatabaseOutlined, LogoutOutlined } from '@ant-design/icons'
+import { UploadOutlined, BarChartOutlined, TeamOutlined, DatabaseOutlined, ScanOutlined, LogoutOutlined } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
@@ -8,6 +8,7 @@ const { Sider, Content } = Layout
 const menuItems = [
   { key: '/admin/upload', icon: <UploadOutlined />, label: 'Upload CSV' },
   { key: '/admin/products', icon: <DatabaseOutlined />, label: 'Products' },
+  { key: '/admin/verify', icon: <ScanOutlined />, label: 'Verify Product' },
   { key: '/admin/reports', icon: <BarChartOutlined />, label: 'Reports' },
   { key: '/admin/users', icon: <TeamOutlined />, label: 'Users' },
   { key: 'logout', icon: <LogoutOutlined />, label: 'Logout', danger: true },
