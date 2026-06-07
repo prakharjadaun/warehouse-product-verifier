@@ -7,7 +7,8 @@ import psycopg2
 
 logger = logging.getLogger(__name__)
 
-CHUNK_SIZE = 10_000
+CHUNK_SIZE = 100_000       # 100K rows per COPY batch — 10x fewer staging round trips
+PROGRESS_EVERY = 5        # update DB progress every N chunks (every 500K rows)
 
 
 def run_bulk_ingest(
@@ -24,6 +25,11 @@ def run_bulk_ingest(
     conn.autocommit = False
     cur = conn.cursor()
 
+    # Tune PostgreSQL session for bulk load performance
+    cur.execute("SET synchronous_commit = OFF")
+    cur.execute("SET work_mem = '256MB'")
+    conn.commit()
+
     try:
         cur.execute("""
             CREATE TEMP TABLE products_staging (
@@ -37,6 +43,7 @@ def run_bulk_ingest(
 
         total_processed = 0
         chunk: list[tuple] = []
+        chunk_count = 0
 
         with open(file_path, encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -51,15 +58,19 @@ def run_bulk_ingest(
                     _copy_and_upsert(cur, chunk)
                     conn.commit()
                     total_processed += len(chunk)
-                    update_progress(total_processed)
+                    chunk_count += 1
                     chunk = []
+                    # Only write progress to DB every PROGRESS_EVERY chunks
+                    if chunk_count % PROGRESS_EVERY == 0:
+                        update_progress(total_processed)
 
         if chunk:
             _copy_and_upsert(cur, chunk)
             conn.commit()
             total_processed += len(chunk)
-            update_progress(total_processed)
 
+        # Always report final count
+        update_progress(total_processed)
         return total_processed
 
     except Exception:
@@ -76,11 +87,10 @@ def _copy_and_upsert(cur, chunk: list[tuple]) -> None:
     writer.writerows(chunk)
     buffer.seek(0)
 
-    cur.copy_from(
+    # copy_expert is faster than copy_from — uses PostgreSQL's native COPY protocol directly
+    cur.copy_expert(
+        "COPY products_staging (wid, ean, manufacturing_date, expiry_date) FROM STDIN WITH (FORMAT csv)",
         buffer,
-        "products_staging",
-        sep=",",
-        columns=("wid", "ean", "manufacturing_date", "expiry_date"),
     )
 
     cur.execute("""
