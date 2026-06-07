@@ -2,8 +2,8 @@ import uuid as uuid_mod
 from datetime import date
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -14,6 +14,50 @@ from app.schemas.verification_log import VerificationIn, VerificationOut
 from app.services.ai_service import compare_dates, extract_dates_from_image
 
 router = APIRouter(tags=["validation"])
+
+
+@router.get("/products")
+async def list_products(
+    search: str | None = Query(None, description="Search by WID or EAN (exact or partial)"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+):
+    today = date.today()
+    conditions = []
+    if search and search.strip():
+        try:
+            numeric = int(search.strip())
+            conditions.append(or_(Product.wid == numeric, Product.ean == numeric))
+        except ValueError:
+            pass  # non-numeric search returns all
+
+    base_query = select(Product)
+    count_query = select(func.count()).select_from(Product)
+    if conditions:
+        base_query = base_query.where(*conditions)
+        count_query = count_query.where(*conditions)
+
+    total = (await db.execute(count_query)).scalar_one()
+    rows = (await db.execute(
+        base_query.order_by(Product.wid).offset((page - 1) * page_size).limit(page_size)
+    )).scalars().all()
+
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "items": [
+            {
+                "wid": p.wid,
+                "ean": p.ean,
+                "manufacturing_date": str(p.manufacturing_date),
+                "expiry_date": str(p.expiry_date),
+                "is_expired": p.expiry_date < today,
+            }
+            for p in rows
+        ],
+    }
 
 IMAGES_DIR = Path("uploads/images")
 IMAGES_DIR.mkdir(parents=True, exist_ok=True)
